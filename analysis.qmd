@@ -107,3 +107,126 @@ ggplot(state_scores_plot, aes(y = stateabb)) +
     caption = "Source: SEDA 2025 state scores database. Gray dots mark 2015 scores."
   )
 ```
+
+```{r}
+atus_con <- dbConnect(duckdb(), "data/atus.duckdb")
+dbplyr_act <- tbl(atus_con, "activities")
+dbplyr_resp <- tbl(atus_con, "respondents")
+dbplyr_codes <- tbl(atus_con, "activity_codes")
+dbplyr_resp
+dbplyr_codes |> collect()
+atus_row_counts <- tibble(
+  table = c("activities", "respondents", "activity_codes"),
+  rows = c(
+    dbplyr_act |> count() |> collect() |> pull(n),
+    dbplyr_resp |> count() |> collect() |> pull(n),
+    dbplyr_codes |> count() |> collect() |> pull(n)
+  )
+)
+atus_row_counts
+activity_category_counts <- dbplyr_act |>
+  inner_join(dbplyr_codes, by = "activity_code") |>
+  count(major_name, name = "n") |>
+  arrange(desc(n)) |>
+  collect()
+activity_category_counts
+average_activity_length <- dbplyr_act |>
+  inner_join(dbplyr_codes, by = "activity_code") |>
+  filter(!is.na(duration_min)) |>
+  group_by(major_name) |>
+  summarise(average_duration_min = mean(duration_min)) |>
+  arrange(desc(average_duration_min)) |>
+  collect()
+average_activity_length
+respondent_counts <- dbplyr_resp |>
+  count(sex, employment_status, name = "n") |>
+  collect()
+respondent_counts
+respondent_counts_by_year <- dbplyr_resp |>
+  count(year, name = "n") |>
+  arrange(year) |>
+  collect()
+respondent_counts_by_year
+weekday_nlf_activity_minutes <- dbplyr_act |>
+  inner_join(
+    dbplyr_resp |>
+      filter(day_type == "Weekday", employment_status == "Not in labor force") |>
+      select(tucaseid, sex),
+    by = "tucaseid"
+  ) |>
+  inner_join(
+    dbplyr_codes |>
+      select(activity_code, major_name),
+    by = "activity_code"
+  ) |>
+  group_by(tucaseid, sex, major_name) |>
+  summarise(minutes = sum(duration_min, na.rm = TRUE), .groups = "drop") |>
+  collect()
+weekday_nlf_activity_minutes
+activity_avg <- weekday_nlf_activity_minutes |>
+  group_by(sex, major_name) |>
+  summarise(mean_minutes = mean(minutes), .groups = "drop")
+activity_avg
+```
+
+```{r}
+keep_cats <- c(
+  "Personal Care Activities",
+  "Household Activities",
+  "Caring For & Helping Household (HH) Members",
+  "Socializing, Relaxing, and Leisure"
+)
+
+hourly_avg <- dbplyr_act |>
+  mutate(hour = start_hhmm %/% 100L) |>
+  filter(hour >= 6L, hour <= 23L) |>
+  left_join(dbplyr_codes |> select(activity_code, major_name), by = "activity_code") |>
+  filter(major_name %in% keep_cats) |>
+  inner_join(
+    dbplyr_resp |>
+      filter(str_starts(employment_status, "Not"), day_type == "Weekday") |>
+      select(tucaseid, sex),
+    by = "tucaseid"
+  ) |>
+  group_by(sex, hour, major_name) |>
+  summarise(avg_min = mean(duration_min, na.rm = TRUE), .groups = "drop") |>
+  collect()
+hourly_avg
+```
+
+```{r}
+activity_avg_plot <- activity_avg |>
+  filter(major_name != "Data Codes") |>
+  group_by(major_name) |>
+  mutate(category_average = mean(mean_minutes)) |>
+  ungroup() |>
+  mutate(major_name = forcats::fct_reorder(major_name, category_average))
+
+ggplot(activity_avg_plot, aes(x = mean_minutes, y = major_name, fill = sex)) +
+  geom_col(position = position_dodge()) +
+  labs(
+    title = "Average Daily Minutes by Major Activity Category",
+    subtitle = "Weekday averages for non-employed respondents, by sex",
+    x = "Average daily minutes",
+    y = "Major activity category",
+    caption = "Source: ATUS database; Data Codes excluded as missing-data bookkeeping."
+  )
+```
+
+```{r}
+ggplot(hourly_avg, aes(x = hour, y = avg_min, fill = major_name)) +
+  geom_area() +
+  facet_wrap(~sex) +
+  scale_x_continuous(
+    breaks = seq(6, 23, by = 3),
+    labels = \(hour) sprintf("%02d:00", hour)
+  ) +
+  labs(
+    title = "How the Day Fills Up",
+    subtitle = "Average minutes spent in selected activities by hour and sex",
+    x = "Hour of day",
+    y = "Average minutes",
+    fill = "Major activity category",
+    caption = "Source: ATUS database; weekday non-employed respondents, hours 6:00 to 23:00."
+  )
+```
