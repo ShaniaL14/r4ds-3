@@ -1,25 +1,25 @@
----
-title: "Analyzing School Districts and Americans' Time Use"
-author: "GitHub Copilot"
-format: html
-execute:
-  echo: false
----
-
-```{r}
+#
+#
+#
+#
+#
+#
+#
+#
+#
 #| message: false
 library(tidyverse)
 library(DBI)
 library(duckdb)
 library(dbplyr)
-```
-
-```{r}
+#
+#
+#
 con <- dbConnect(duckdb(), "data/seda_2025.duckdb")
 dbplyr_dist <- tbl(con, "district_scores")
-```
-
-```{r}
+#
+#
+#
 #| cache: true
 #| cache.extra: !expr file.mtime("data/seda_2025.duckdb")
 score_change <- dbplyr_dist |>
@@ -40,9 +40,45 @@ state_change <- tbl(con, "state_scores") |>
   mutate(rla_change = rla_2023 - rla_2015) |>
   select(stateabb, rla_change) |>
   arrange(rla_change)
-```
+state_change
+#
+#
+#
+rla_2023 <- dbplyr_dist |>
+  filter(year == 2023, !is.na(rla_score)) |>
+  select(rla_score) |>
+  collect()
 
-```{r}
+ggplot(rla_2023, aes(x = rla_score)) +
+  geom_histogram(bins = 30) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(
+    title = "Distribution of 2023 Reading Scores",
+    subtitle = paste("District count:", nrow(rla_2023)),
+    x = "Reading score",
+    y = "Number of districts",
+    caption = "Source: SEDA 2025 district scores database."
+  )
+#
+#
+#
+rla_change <- score_change |>
+  rename(rla_change = score_change)
+
+ggplot(rla_change, aes(x = rla_change, fill = rla_change > 0)) +
+  geom_histogram(bins = 30) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(
+    title = "Distribution of District Reading Score Changes",
+    subtitle = paste("District count:", nrow(rla_change)),
+    x = "Reading score change",
+    y = "Number of districts",
+    fill = "Change is positive",
+    caption = "Source: SEDA 2025 district scores database; change is 2023 minus 2015."
+  )
+#
+#
+#
 state_scores_plot <- tbl(con, "state_scores") |>
   filter(year %in% c(2015, 2023), !is.na(rla_score)) |>
   select(stateabb, year, rla_score) |>
@@ -70,13 +106,15 @@ ggplot(state_scores_plot, aes(y = stateabb)) +
     y = NULL,
     caption = "Source: SEDA 2025 state scores database. Gray dots mark 2015 scores."
   )
-```
-
-```{r}
+#
+#
+#
 atus_con <- dbConnect(duckdb(), "data/atus.duckdb")
 dbplyr_act <- tbl(atus_con, "activities")
 dbplyr_resp <- tbl(atus_con, "respondents")
 dbplyr_codes <- tbl(atus_con, "activity_codes")
+dbplyr_resp
+dbplyr_codes |> collect()
 atus_row_counts <- tibble(
   table = c("activities", "respondents", "activity_codes"),
   rows = c(
@@ -85,11 +123,13 @@ atus_row_counts <- tibble(
     dbplyr_codes |> count() |> collect() |> pull(n)
   )
 )
+atus_row_counts
 activity_category_counts <- dbplyr_act |>
   inner_join(dbplyr_codes, by = "activity_code") |>
   count(major_name, name = "n") |>
   arrange(desc(n)) |>
   collect()
+activity_category_counts
 average_activity_length <- dbplyr_act |>
   inner_join(dbplyr_codes, by = "activity_code") |>
   filter(!is.na(duration_min)) |>
@@ -97,13 +137,16 @@ average_activity_length <- dbplyr_act |>
   summarise(average_duration_min = mean(duration_min)) |>
   arrange(desc(average_duration_min)) |>
   collect()
+average_activity_length
 respondent_counts <- dbplyr_resp |>
   count(sex, employment_status, name = "n") |>
   collect()
+respondent_counts
 respondent_counts_by_year <- dbplyr_resp |>
   count(year, name = "n") |>
   arrange(year) |>
   collect()
+respondent_counts_by_year
 weekday_nlf_activity_minutes <- dbplyr_act |>
   inner_join(
     dbplyr_resp |>
@@ -119,12 +162,14 @@ weekday_nlf_activity_minutes <- dbplyr_act |>
   group_by(tucaseid, sex, major_name) |>
   summarise(minutes = sum(duration_min, na.rm = TRUE), .groups = "drop") |>
   collect()
+weekday_nlf_activity_minutes
 activity_avg <- weekday_nlf_activity_minutes |>
   group_by(sex, major_name) |>
   summarise(mean_minutes = mean(minutes), .groups = "drop")
-```
-
-```{r}
+activity_avg
+#
+#
+#
 keep_cats <- c(
   "Personal Care Activities",
   "Household Activities",
@@ -146,9 +191,10 @@ hourly_avg <- dbplyr_act |>
   group_by(sex, hour, major_name) |>
   summarise(avg_min = mean(duration_min, na.rm = TRUE), .groups = "drop") |>
   collect()
-```
-
-```{r}
+hourly_avg
+#
+#
+#
 activity_avg_plot <- activity_avg |>
   filter(major_name != "Data Codes") |>
   group_by(major_name) |>
@@ -165,9 +211,9 @@ ggplot(activity_avg_plot, aes(x = mean_minutes, y = major_name, fill = sex)) +
     y = "Major activity category",
     caption = "Source: ATUS database; Data Codes excluded as missing-data bookkeeping."
   )
-```
-
-```{r}
+#
+#
+#
 ggplot(hourly_avg, aes(x = hour, y = avg_min, fill = major_name)) +
   geom_area() +
   facet_wrap(~sex) +
@@ -183,4 +229,7 @@ ggplot(hourly_avg, aes(x = hour, y = avg_min, fill = major_name)) +
     fill = "Major activity category",
     caption = "Source: ATUS database; weekday non-employed respondents, hours 6:00 to 23:00."
   )
-```
+#
+#
+#
+#

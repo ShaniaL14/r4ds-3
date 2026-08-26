@@ -1,25 +1,25 @@
----
-title: "Analyzing School Districts and Americans' Time Use"
-author: "GitHub Copilot"
-format: html
-execute:
-  echo: false
----
-
-```{r}
+#
+#
+#
+#
+#
+#
+#
+#
+#
 #| message: false
 library(tidyverse)
 library(DBI)
 library(duckdb)
 library(dbplyr)
-```
-
-```{r}
+#
+#
+#
 con <- dbConnect(duckdb(), "data/seda_2025.duckdb")
 dbplyr_dist <- tbl(con, "district_scores")
-```
-
-```{r}
+#
+#
+#
 #| cache: true
 #| cache.extra: !expr file.mtime("data/seda_2025.duckdb")
 score_change <- dbplyr_dist |>
@@ -40,9 +40,9 @@ state_change <- tbl(con, "state_scores") |>
   mutate(rla_change = rla_2023 - rla_2015) |>
   select(stateabb, rla_change) |>
   arrange(rla_change)
-```
-
-```{r}
+#
+#
+#
 state_scores_plot <- tbl(con, "state_scores") |>
   filter(year %in% c(2015, 2023), !is.na(rla_score)) |>
   select(stateabb, year, rla_score) |>
@@ -70,9 +70,9 @@ ggplot(state_scores_plot, aes(y = stateabb)) +
     y = NULL,
     caption = "Source: SEDA 2025 state scores database. Gray dots mark 2015 scores."
   )
-```
-
-```{r}
+#
+#
+#
 atus_con <- dbConnect(duckdb(), "data/atus.duckdb")
 dbplyr_act <- tbl(atus_con, "activities")
 dbplyr_resp <- tbl(atus_con, "respondents")
@@ -122,9 +122,9 @@ weekday_nlf_activity_minutes <- dbplyr_act |>
 activity_avg <- weekday_nlf_activity_minutes |>
   group_by(sex, major_name) |>
   summarise(mean_minutes = mean(minutes), .groups = "drop")
-```
-
-```{r}
+#
+#
+#
 keep_cats <- c(
   "Personal Care Activities",
   "Household Activities",
@@ -146,9 +146,9 @@ hourly_avg <- dbplyr_act |>
   group_by(sex, hour, major_name) |>
   summarise(avg_min = mean(duration_min, na.rm = TRUE), .groups = "drop") |>
   collect()
-```
-
-```{r}
+#
+#
+#
 activity_avg_plot <- activity_avg |>
   filter(major_name != "Data Codes") |>
   group_by(major_name) |>
@@ -165,9 +165,9 @@ ggplot(activity_avg_plot, aes(x = mean_minutes, y = major_name, fill = sex)) +
     y = "Major activity category",
     caption = "Source: ATUS database; Data Codes excluded as missing-data bookkeeping."
   )
-```
-
-```{r}
+#
+#
+#
 ggplot(hourly_avg, aes(x = hour, y = avg_min, fill = major_name)) +
   geom_area() +
   facet_wrap(~sex) +
@@ -183,4 +183,7 @@ ggplot(hourly_avg, aes(x = hour, y = avg_min, fill = major_name)) +
     fill = "Major activity category",
     caption = "Source: ATUS database; weekday non-employed respondents, hours 6:00 to 23:00."
   )
-```
+#
+#
+#
+#
